@@ -1,1 +1,1 @@
-# lstm_time_series
+# lstm-time-series
