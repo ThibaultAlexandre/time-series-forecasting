@@ -4,19 +4,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from sklearn.preprocessing import MinMaxScaler
-
 
 def average(l,average_size):
-    res = np.zeros(len(l)-average_size+1)
-    for i in range(len(l)-average_size+1):
-        res[i] = (sum(l[i:i+average_size])/len(l[i:i+average_size]))
+    number_of_rows = l.shape[0]
+    number_of_features = l.shape[1]
+    res = np.zeros((number_of_rows-average_size+1,number_of_features))
+    for i in range(number_of_rows-average_size+1):
+        res[i] = (sum(l[i:i+average_size])/average_size)
     return res
 
 def sliding_windows(data, seq_length, average_size):
     X = []
     y = []
-    data = average(np.array(data).reshape(-1),average_size).reshape(-1,1)
+    data = average(np.array(data),average_size)
     for i in range(len(data)-seq_length):
         Xi = data[i:(i+seq_length)]
         yi = data[i+seq_length]
@@ -34,7 +34,7 @@ def process_data(data, seq_length,average_size, train_proportion, scaler):
     #Transforming all data
     data_normalized = scaler.transform(data)
     X,y = sliding_windows(data_normalized,seq_length, average_size)
-    
+
     #Raw Target
     y_raw = data_normalized[seq_length-1+average_size:]
     y_raw = Variable(torch.Tensor(y_raw))
@@ -57,7 +57,7 @@ def process_data_diff(data, seq_length, average_size, train_proportion, scaler):
     data = np.array(data)
     
     #Differencing the time series
-    data_diff = np.diff(data.reshape(data.shape[0])).reshape(-1,1)
+    data_diff = np.diff(data, axis = 0)
 
     #Fitting on training data
     train_size = int(len(data_diff) * train_proportion)    

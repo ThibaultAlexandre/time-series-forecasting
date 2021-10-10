@@ -11,10 +11,11 @@ from sklearn.metrics import r2_score
 from tqdm import trange
 
 class LstmNeuralNetwork(nn.Module):
-    def __init__(self,input_size, num_layers, hidden_size, seq_length):
+    def __init__(self,input_size, num_layers, hidden_size, seq_length, output_size = 1):
         super(LstmNeuralNetwork, self).__init__()
         #Attributes from nn.Module
         self.input_size = input_size #input size
+        self.output_size = output_size #output size
         self.num_layers = num_layers #number of layers
         self.hidden_size = hidden_size #hidden state
         
@@ -23,7 +24,7 @@ class LstmNeuralNetwork(nn.Module):
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, 
                             num_layers=num_layers, batch_first = True) #lstm
         
-        self.fc =  nn.Linear(hidden_size, 1) #fully connected linear
+        self.fc =  nn.Linear(hidden_size, output_size) #fully connected linear
 
 
     def forward(self,X):
@@ -65,19 +66,19 @@ class LstmNeuralNetwork(nn.Module):
     
     def get_horizon_predictions(self, X_data, y_data, scaler, horizon):
         total_days = X_data.shape[0]
-        predictions = np.ndarray(shape=(total_days-horizon+1,horizon), dtype=float)
+        predictions = np.ndarray(shape=(total_days-horizon+1,horizon, self.output_size), dtype=float)
         for i in range(total_days-horizon+1):
             X_temp = X_data[i].unsqueeze(0)
             for j in range(horizon):
                 next_prediction = self(X_temp)
-                predictions[i,j] = scaler.inverse_transform(next_prediction.detach().numpy()).squeeze()
+                predictions[i,j,:] = scaler.inverse_transform(next_prediction.detach().numpy())
                 X_temp_shifted = X_temp[:,1:].reshape((1,self.seq_length-1,self.input_size))
                 X_temp = torch.cat((X_temp_shifted,next_prediction.unsqueeze(0)),1)
         return predictions
     
     def get_accuracy(self, X_data, y_data, naive_prediction, scaler, last_day):
-        lstm_prediction = scaler.inverse_transform(self(X_data).detach().numpy())
-        real_values = scaler.inverse_transform(y_data.numpy())
+        lstm_prediction = scaler.inverse_transform(self(X_data).detach().numpy())[:,:1]
+        real_values = scaler.inverse_transform(y_data.numpy())[:,:1]
 
         naive_error = mean_squared_error(real_values[:last_day:1],naive_prediction[:last_day:1])
         lstm_error = mean_squared_error(real_values[:last_day:1],lstm_prediction[:last_day:1])
@@ -91,9 +92,9 @@ class LstmNeuralNetwork(nn.Module):
         print('R2 up to the ' + str(last_day) + ' day using the lstm prediction : ' + str(lstm_r2))
     
     def get_accuracy_with_horizon(self, X_data, y_data, naive_prediction_without_horizon, scaler, last_day, horizon):
-        lstm_prediction = self.get_horizon_predictions(X_data, y_data, scaler, horizon)
+        lstm_prediction = self.get_horizon_predictions(X_data, y_data, scaler, horizon)[:,:,0]
         total_days = lstm_prediction.shape[0]
-        real_values_without_horizon = scaler.inverse_transform(y_data.numpy())
+        real_values_without_horizon = scaler.inverse_transform(y_data.numpy())[:,:1]
         real_values = np.ndarray(shape=(total_days,horizon), dtype=float)
         naive_prediction = np.ndarray(shape=(total_days,horizon), dtype=float)
         for i in range(total_days):
@@ -111,10 +112,11 @@ class LstmNeuralNetwork(nn.Module):
         print('Mean squared error up to the ' + str(last_day) + ' day using the lstm prediction : ' + str(lstm_error))
         print('R2 up to the ' + str(last_day) + ' day using the naive prediction : ' + str(naive_r2))
         print('R2 up to the ' + str(last_day) + ' day using the lstm prediction : ' + str(lstm_r2))
-        
+
+
     def plot(self, X_data, y_data, scaler):
-        lstm_prediction = scaler.inverse_transform(self(X_data).detach().numpy())
-        real_values = scaler.inverse_transform(y_data.numpy())
+        lstm_prediction = scaler.inverse_transform(self(X_data).detach().numpy())[:,:1]
+        real_values = scaler.inverse_transform(y_data.numpy())[:,:1]
         plt.plot(real_values, label='Actual value', c = 'b')
         plt.plot(lstm_prediction, label='LSTM Prediction', c = 'r')
         plt.legend()
@@ -122,8 +124,8 @@ class LstmNeuralNetwork(nn.Module):
         
     def plot_with_horizon(self, X_data, y_data, scaler, horizon, drawing_jump):
         colors = ['r','g','k','y']
-        real_values = scaler.inverse_transform(y_data.numpy())
-        predictions = self.get_horizon_predictions(X_data, y_data, scaler, horizon)
+        real_values = scaler.inverse_transform(y_data.numpy())[:,:1]
+        predictions = self.get_horizon_predictions(X_data, y_data, scaler, horizon)[:,:,0]
         plt.plot(real_values, label='Actual value', c = 'b')
         for i in range(0,predictions.shape[0], drawing_jump):
             plt.plot(np.arange(i,i+horizon),predictions[i], c = colors[int(i/drawing_jump) % len(colors)])
