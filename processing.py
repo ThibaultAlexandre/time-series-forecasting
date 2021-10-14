@@ -1,4 +1,4 @@
-# time_series_processing : This file contains functions for processing time series
+# processing : This file contains functions for processing time series
 
 import numpy as np
 import torch
