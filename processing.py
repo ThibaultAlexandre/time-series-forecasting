@@ -84,3 +84,36 @@ def process_data_diff(data, seq_length, average_size, train_proportion, scaler):
     y_test = Variable(torch.Tensor(y[train_size:len(X)]))
 
     return y_raw, X_data, y_data, X_train, y_train, X_test, y_test
+
+def process_data_custom(data, seq_length, average_size, train_proportion, scaler):
+    data = np.array(data)
+    data[1:,0] = np.diff(data[:,0], axis = 0)
+    data[0,0] = 0
+
+    #Fitting on training data
+    train_size = int(len(data) * train_proportion)    
+    scaler.fit(data[0:train_size])
+
+    #Transforming all data
+    data_normalized = scaler.transform(data)
+    X,y = sliding_windows(data_normalized,seq_length,average_size)
+    
+    #Raw Target
+    y_raw = data_normalized[seq_length-1+average_size:]
+    y_raw = Variable(torch.Tensor(y_raw))
+    
+    #All data
+    X_data = Variable(torch.Tensor(X))
+    y_data = Variable(torch.Tensor(y))
+    
+    #Training 
+    X_train = Variable(torch.Tensor(X[0:train_size]))
+    y_train = Variable(torch.Tensor(y[0:train_size]))
+        
+    #Test
+    X_test = Variable(torch.Tensor(X[train_size:len(X)]))
+    y_test = Variable(torch.Tensor(y[train_size:len(X)]))
+
+    return y_raw, X_data, y_data, X_train, y_train, X_test, y_test
+
+        
